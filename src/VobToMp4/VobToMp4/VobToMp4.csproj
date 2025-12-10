@@ -6,4 +6,16 @@
         <ImplicitUsings>enable</ImplicitUsings>
     </PropertyGroup>
 
+    <ItemGroup>
+      <PackageReference Include="FFMpegCore" Version="5.4.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="ffmpeg\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="ffmpeg\ffmpeg.exe" />
+    </ItemGroup>
+
 </Project>

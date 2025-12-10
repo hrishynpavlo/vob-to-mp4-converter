@@ -1,3 +1,4 @@
+using FFMpegCore;
 using VobToMp4.Components;
 
 namespace VobToMp4;
@@ -30,6 +31,12 @@ public class Program
         app.MapRazorComponents<App>()
             .AddInteractiveServerRenderMode();
 
+        GlobalFFOptions.Configure(options =>
+        {
+            // Use absolute path to the ffmpeg binary folder so FFMpegCore can find executables reliably.
+            options.BinaryFolder = System.IO.Path.Combine(AppContext.BaseDirectory, "ffmpeg");
+        });
+        
         app.Run();
     }
 }
