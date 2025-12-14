@@ -17,41 +17,28 @@
                     </h3>
                 </div>
                 <div class="card-body p-4">
-                    @if (!isConverting)
-                    {
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">Select VOB File</label>
-                            <InputFile OnChange="OnInputFileChange" class="form-control" accept=".vob" disabled="@isConverting" />
-                            @if (selectedFile != null)
-                            {
-                                <div class="mt-2 text-muted">
-                                    <small>
-                                        <i class="bi bi-file-earmark-check"></i> Selected: <strong>@selectedFile.Name</strong> 
-                                        (@FormatFileSize(selectedFile.Size))
-                                    </small>
-                                </div>
-                            }
-                        </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Select VOB File</label>
+                        <InputFile OnChange="OnInputFileChange" class="form-control" accept=".vob" disabled="@isConverting" />
+                        @if (selectedFile != null)
+                        {
+                            <div class="mt-2 text-muted">
+                                <small>
+                                    <i class="bi bi-file-earmark-check"></i> Selected: <strong>@selectedFile.Name</strong> 
+                                    (@FormatFileSize(selectedFile.Size))
+                                </small>
+                            </div>
+                        }
+                    </div>
 
-                        <div class="d-grid">
-                            <button @onclick="ConvertVideo" class="btn btn-primary btn-lg" disabled="@(selectedFile == null || isConverting)">
-                                <i class="bi bi-arrow-repeat"></i> Convert to MP4
-                            </button>
-                        </div>
-                    }
-                    else
+                    @if (isConverting)
                     {
-                        <div class="conversion-progress">
-                            <h5 class="mb-3">Converting: @selectedFile?.Name</h5>
-                            
-                            <div class="progress mb-3" style="height: 30px;">
+                        <div class="conversion-progress mb-4">
+                            <div class="progress mb-2" style="height: 30px;">
                                 <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
                                      role="progressbar" 
-                                     style="width: @(progressPercentage)%"
-                                     aria-valuenow="@progressPercentage" 
-                                     aria-valuemin="0" 
-                                     aria-valuemax="100">
-                                    @progressPercentage.ToString("F1")%
+                                     style="width: 100%">
+                                    @currentTimeStamp
                                 </div>
                             </div>
 
@@ -63,6 +50,12 @@
                             </div>
                         </div>
                     }
+
+                    <div class="d-grid">
+                        <button @onclick="ConvertVideo" class="btn btn-primary btn-lg" disabled="@(selectedFile == null || isConverting)">
+                            <i class="bi bi-arrow-repeat"></i> Convert to MP4
+                        </button>
+                    </div>
 
                     @if (!string.IsNullOrEmpty(errorMessage))
                     {
@@ -80,9 +73,9 @@
 @code {
     private IBrowserFile? selectedFile;
     private bool isConverting = false;
-    private double progressPercentage = 0;
     private string statusMessage = "Starting conversion...";
     private string errorMessage = string.Empty;
+    private string currentTimeStamp = "00:00:00";
 
     private void OnInputFileChange(InputFileChangeEventArgs e)
     {
@@ -108,9 +101,9 @@
         if (selectedFile == null) return;
 
         isConverting = true;
-        progressPercentage = 0;
         statusMessage = "Starting conversion...";
         errorMessage = string.Empty;
+        currentTimeStamp = "00:00:00";
         StateHasChanged();
 
         try
@@ -118,22 +111,21 @@
             var path = Path.Combine(Path.GetTempPath(), selectedFile.Name);
             await using var inputStream = selectedFile.OpenReadStream(selectedFile.Size);
             var outPath = Path.ChangeExtension(path, ".mp4");
-
+            
             var ffmpegArgs = FFMpegArguments
                 .FromPipeInput(new StreamPipeSource(inputStream))
                 .OutputToFile(outPath)
-                .NotifyOnProgress(completionPercentage =>
+                .NotifyOnProgress(ts =>
                 {
-                    var percentage = Math.Abs(completionPercentage - 100) < 1 ? completionPercentage : completionPercentage / 100;
-                    
                     InvokeAsync(() =>
                     {
-                        progressPercentage = percentage;
-                        statusMessage = $"Converting... {percentage:F1}% complete";
+                        currentTimeStamp = ts.ToString(@"hh\:mm\:ss");
+                        statusMessage = $"Processing... {currentTimeStamp}";
                         StateHasChanged();
                     });
                     
-                }, TimeSpan.FromSeconds(1));
+                    Log.Logger.Information("Processing file: {fileName}. Current time: {timeStamp}", selectedFile.Name, ts.ToString(@"hh\:mm\:ss"));
+                });
 
             statusMessage = "Processing video...";
             StateHasChanged();
@@ -146,7 +138,6 @@
                 });
 
             statusMessage = "Reading converted file...";
-            progressPercentage = 100;
             StateHasChanged();
 
             var data = await File.ReadAllBytesAsync(outPath);
@@ -170,7 +161,7 @@
         finally
         {
             isConverting = false;
-            progressPercentage = 0;
+            currentTimeStamp = "00:00:00";
             StateHasChanged();
         }
     }

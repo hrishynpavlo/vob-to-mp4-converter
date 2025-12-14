@@ -14,11 +14,9 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="ffmpeg\" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Remove="ffmpeg\ffmpeg.exe" />
+      <None Include="ffmpeg\**\*">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
 </Project>
