@@ -5,59 +5,173 @@
 @rendermode InteractiveServer
 @inject IJSRuntime JS
 
-<PageTitle>Home</PageTitle>
+<PageTitle>VOB to MP4 Converter</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-lg">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">
+                        <i class="bi bi-film"></i> VOB to MP4 Converter
+                    </h3>
+                </div>
+                <div class="card-body p-4">
+                    @if (!isConverting)
+                    {
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Select VOB File</label>
+                            <InputFile OnChange="OnInputFileChange" class="form-control" accept=".vob" disabled="@isConverting" />
+                            @if (selectedFile != null)
+                            {
+                                <div class="mt-2 text-muted">
+                                    <small>
+                                        <i class="bi bi-file-earmark-check"></i> Selected: <strong>@selectedFile.Name</strong> 
+                                        (@FormatFileSize(selectedFile.Size))
+                                    </small>
+                                </div>
+                            }
+                        </div>
 
-Welcome to your new app.
+                        <div class="d-grid">
+                            <button @onclick="ConvertVideo" class="btn btn-primary btn-lg" disabled="@(selectedFile == null || isConverting)">
+                                <i class="bi bi-arrow-repeat"></i> Convert to MP4
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="conversion-progress">
+                            <h5 class="mb-3">Converting: @selectedFile?.Name</h5>
+                            
+                            <div class="progress mb-3" style="height: 30px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                     role="progressbar" 
+                                     style="width: @(progressPercentage)%"
+                                     aria-valuenow="@progressPercentage" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100">
+                                    @progressPercentage.ToString("F1")%
+                                </div>
+                            </div>
 
-<div>
-    <InputFile OnChange="OnInputFileChange" />
+                            <div class="text-center text-muted">
+                                <div class="spinner-border spinner-border-sm me-2" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <span>@statusMessage</span>
+                            </div>
+                        </div>
+                    }
 
-    <button @onclick="ConvertVideo">Convert to MP4</button>
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger mt-3" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill"></i> @errorMessage
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
 
 @code {
     private IBrowserFile? selectedFile;
+    private bool isConverting = false;
+    private double progressPercentage = 0;
+    private string statusMessage = "Starting conversion...";
+    private string errorMessage = string.Empty;
 
-    private void OnInputFileChange(InputFileChangeEventArgs e) => selectedFile = e.File;
+    private void OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        errorMessage = string.Empty;
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
 
     private async Task ConvertVideo()
     {
         if (selectedFile == null) return;
-        var path = Path.Combine(Path.GetTempPath(), selectedFile.Name);
-        await using var inputStream = selectedFile.OpenReadStream(selectedFile.Size);
-        var outPath = Path.ChangeExtension(path, ".mp4");
-        
-        await Task.Run(async () =>
+
+        isConverting = true;
+        progressPercentage = 0;
+        statusMessage = "Starting conversion...";
+        errorMessage = string.Empty;
+        StateHasChanged();
+
+        try
         {
-            try
-            {
-                var ffmpegArgs = FFMpegArguments
-                    .FromPipeInput(new StreamPipeSource(inputStream))
-                    .OutputToFile(outPath)
-                    .NotifyOnProgress(completionPercentage =>
-                    {
-                        Log.Logger.Information("Processing file: {fileName}. Progress: {completionPercentage}%", selectedFile.Name, completionPercentage);
-                    }, TimeSpan.FromSeconds(1));
+            var path = Path.Combine(Path.GetTempPath(), selectedFile.Name);
+            await using var inputStream = selectedFile.OpenReadStream(selectedFile.Size);
+            var outPath = Path.ChangeExtension(path, ".mp4");
 
-                var ffmpegResult = await ffmpegArgs
-                    .ProcessAsynchronously(throwOnError: true, ffMpegOptions: new FFOptions
+            var ffmpegArgs = FFMpegArguments
+                .FromPipeInput(new StreamPipeSource(inputStream))
+                .OutputToFile(outPath)
+                .NotifyOnProgress(completionPercentage =>
+                {
+                    var percentage = Math.Abs(completionPercentage - 100) < 1 ? completionPercentage : completionPercentage / 100;
+                    
+                    InvokeAsync(() =>
                     {
-                        LogLevel = FFMpegLogLevel.Verbose, 
-                        BinaryFolder = Path.Combine(AppContext.BaseDirectory, "ffmpeg")
+                        progressPercentage = percentage;
+                        statusMessage = $"Converting... {percentage:F1}% complete";
+                        StateHasChanged();
                     });
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine(ex);
-                await JS.InvokeVoidAsync("alert", "Conversion failed: " + ex.Message);
-                return;
-            }
-        });
+                    
+                }, TimeSpan.FromSeconds(1));
 
-        var data = await File.ReadAllBytesAsync(outPath);
-        await JS.InvokeVoidAsync("downloadFile", data, "video/mp4", Path.ChangeExtension(selectedFile.Name, ".mp4"));
-        File.Delete(outPath);
+            statusMessage = "Processing video...";
+            StateHasChanged();
+
+            var ffmpegResult = await ffmpegArgs
+                .ProcessAsynchronously(throwOnError: true, ffMpegOptions: new FFOptions
+                {
+                    LogLevel = FFMpegLogLevel.Verbose,
+                    BinaryFolder = Path.Combine(AppContext.BaseDirectory, "ffmpeg")
+                });
+
+            statusMessage = "Reading converted file...";
+            progressPercentage = 100;
+            StateHasChanged();
+
+            var data = await File.ReadAllBytesAsync(outPath);
+            
+            statusMessage = "Downloading...";
+            StateHasChanged();
+            
+            await JS.InvokeVoidAsync("downloadFile", data, "video/mp4", Path.ChangeExtension(selectedFile.Name, ".mp4"));
+            
+            File.Delete(outPath);
+
+            statusMessage = "Conversion completed!";
+            Log.Logger.Information("Conversion completed successfully for file: {fileName}", selectedFile.Name);
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Error(ex, "Conversion failed for file: {fileName}", selectedFile?.Name);
+            errorMessage = $"Conversion failed: {ex.Message}";
+            statusMessage = "Conversion failed";
+        }
+        finally
+        {
+            isConverting = false;
+            progressPercentage = 0;
+            StateHasChanged();
+        }
     }
 }
