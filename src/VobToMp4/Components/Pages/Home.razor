@@ -81,19 +81,12 @@
                                     <span class="stat-label"><i class="bi bi-file-earmark-zip"></i> Converted Size:</span>
                                     <span class="stat-value">@conversionStats.ConvertedSize</span>
                                 </div>
-                                <div class="stat-row">
-                                    <span class="stat-label"><i class="bi bi-arrow-down-up"></i> Size Difference:</span>
-                                    <span class="stat-value @(conversionStats.SizeDifferenceBytes < 0 ? "text-success" : "text-danger")">
-                                        @conversionStats.SizeDifference (@conversionStats.SizeDifferencePercent)
-                                    </span>
-                                </div>
                             </div>
                         </div>
                     }
                 </div>
         </div>
 </div>
-
 
 @code {
     private IBrowserFile? selectedFile;
@@ -103,37 +96,13 @@
     private string currentTimeStamp = "00:00:00";
     private bool conversionCompleted = false;
     private ConversionStats? conversionStats = null;
-
-    private class ConversionStats
-    {
-        public string ConversionTime { get; set; } = string.Empty;
-        public string VideoDuration { get; set; } = string.Empty;
-        public string OriginalSize { get; set; } = string.Empty;
-        public string ConvertedSize { get; set; } = string.Empty;
-        public string SizeDifference { get; set; } = string.Empty;
-        public string SizeDifferencePercent { get; set; } = string.Empty;
-        public long SizeDifferenceBytes { get; set; }
-    }
-
+    
     private void OnInputFileChange(InputFileChangeEventArgs e)
     {
         selectedFile = e.File;
         errorMessage = string.Empty;
         conversionCompleted = false;
         conversionStats = null;
-    }
-
-    private string FormatFileSize(long bytes)
-    {
-        string[] sizes = { "B", "KB", "MB", "GB" };
-        double len = bytes;
-        int order = 0;
-        while (len >= 1024 && order < sizes.Length - 1)
-        {
-            order++;
-            len = len / 1024;
-        }
-        return $"{len:0.##} {sizes[order]}";
     }
 
     private async Task ConvertVideo()
@@ -148,7 +117,7 @@
         conversionStats = null;
         StateHasChanged();
 
-        var startTime = DateTime.Now;
+        var startTime = DateTime.UtcNow;
         TimeSpan videoDuration = TimeSpan.Zero;
         long originalSize = selectedFile.Size;
 
@@ -195,22 +164,15 @@
             
             File.Delete(outPath);
 
-            var endTime = DateTime.Now;
+            var endTime = DateTime.UtcNow;
             var conversionTime = endTime - startTime;
-
-            // Вычисляем разницу в размере
-            long sizeDiff = convertedSize - originalSize;
-            double sizePercent = ((double)sizeDiff / originalSize) * 100;
 
             conversionStats = new ConversionStats
             {
                 ConversionTime = FormatTimeSpan(conversionTime),
                 VideoDuration = FormatTimeSpan(videoDuration),
                 OriginalSize = FormatFileSize(originalSize),
-                ConvertedSize = FormatFileSize(convertedSize),
-                SizeDifference = (sizeDiff > 0 ? "+" : "") + FormatFileSize(Math.Abs(sizeDiff)),
-                SizeDifferencePercent = $"{(sizePercent > 0 ? "+" : "")}{sizePercent:0.##}%",
-                SizeDifferenceBytes = sizeDiff
+                ConvertedSize = FormatFileSize(convertedSize)
             };
 
             conversionCompleted = true;
@@ -229,15 +191,5 @@
             currentTimeStamp = "00:00:00";
             StateHasChanged();
         }
-    }
-
-    private string FormatTimeSpan(TimeSpan ts)
-    {
-        if (ts.TotalHours >= 1)
-            return ts.ToString(@"hh\:mm\:ss");
-        else if (ts.TotalMinutes >= 1)
-            return ts.ToString(@"mm\:ss");
-        else
-            return ts.ToString(@"ss\.ff") + "s";
     }
 }
