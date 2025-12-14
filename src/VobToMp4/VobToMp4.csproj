@@ -7,7 +7,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="FFMpegCore" Version="5.4.0" />
+      <PackageReference Include="Serilog" />
+      <PackageReference Include="Serilog.Sinks.Console" />
+      <PackageReference Include="Serilog.AspNetCore" />
+      <PackageReference Include="FFMpegCore" />
     </ItemGroup>
 
     <ItemGroup>

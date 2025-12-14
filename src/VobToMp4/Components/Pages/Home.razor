@@ -1,6 +1,7 @@
 @page "/"
 @using FFMpegCore.Enums
 @using FFMpegCore.Pipes
+@using Serilog
 @rendermode InteractiveServer
 @inject IJSRuntime JS
 
@@ -24,20 +25,21 @@ Welcome to your new app.
     private async Task ConvertVideo()
     {
         if (selectedFile == null) return;
-        var inPath = Path.Combine(Path.GetTempPath(), selectedFile.Name);
-        await using (var fs = File.Create(inPath))
-        {
-            await selectedFile.OpenReadStream(selectedFile.Size).CopyToAsync(fs);
-        }
-        var outPath = Path.ChangeExtension(inPath, ".mp4");
+        var path = Path.Combine(Path.GetTempPath(), selectedFile.Name);
+        await using var inputStream = selectedFile.OpenReadStream(selectedFile.Size);
+        var outPath = Path.ChangeExtension(path, ".mp4");
         
         await Task.Run(async () =>
         {
             try
             {
                 var ffmpegArgs = FFMpegArguments
-                    .FromFileInput(inPath)
-                    .OutputToFile(outPath);
+                    .FromPipeInput(new StreamPipeSource(inputStream))
+                    .OutputToFile(outPath)
+                    .NotifyOnProgress(completionPercentage =>
+                    {
+                        Log.Logger.Information("Processing file: {fileName}. Progress: {completionPercentage}%", selectedFile.Name, completionPercentage);
+                    }, TimeSpan.FromSeconds(1));
 
                 var ffmpegResult = await ffmpegArgs
                     .ProcessAsynchronously(throwOnError: true, ffMpegOptions: new FFOptions
@@ -56,7 +58,6 @@ Welcome to your new app.
 
         var data = await File.ReadAllBytesAsync(outPath);
         await JS.InvokeVoidAsync("downloadFile", data, "video/mp4", Path.ChangeExtension(selectedFile.Name, ".mp4"));
-        File.Delete(inPath);
         File.Delete(outPath);
     }
 }
