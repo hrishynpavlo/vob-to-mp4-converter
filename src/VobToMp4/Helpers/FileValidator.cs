@@ -5,12 +5,18 @@ namespace VobToMp4.Helpers;
 
 public class FileValidator
 {
+    private const int MaxFileCount = 5;
     private static readonly IReadOnlySet<string> AllowedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         ".vob"
     };
     
-    public Result<None, MappingError> Validate(IBrowserFile file)
+    public IReadOnlyDictionary<string, Result<None, MappingError>> Validate(IReadOnlyCollection<IBrowserFile> files)
+    {
+        return files.ToDictionary(k => k.Name, Validate);
+    }
+    
+    private static Result<None, MappingError> Validate(IBrowserFile file)
     {
         // limit to 1 GB + 10%
         if (file.Size > 1e+9 * 1.1)

@@ -12,15 +12,22 @@
     <div class="card shadow-lg">
         <div class="card-body p-5">
                     <div class="mb-5">
-                        <label class="form-label fw-bold">Select VOB File</label>
-                        <InputFile OnChange="OnInputFileChange" class="form-control" accept=".vob" disabled="@isConverting" />
-                        @if (selectedFile != null)
+                        <label class="form-label fw-bold">Select VOB Files (max 5)</label>
+                        <InputFile OnChange="OnInputFileChange" class="form-control" accept=".vob" multiple disabled="@isConverting" />
+                        
+                        @if (selectedFiles.Any())
                         {
-                            <div class="mt-3 text-muted">
-                                <small>
-                                    <i class="bi bi-file-earmark-check"></i> Selected: <strong>@selectedFile.Name</strong> 
-                                    (@FormatFileSize(selectedFile.Size))
-                                </small>
+                            <div class="mt-3">
+                                <strong>Selected files (@selectedFiles.Count):</strong>
+                                <ul class="list-group mt-2">
+                                    @foreach (var file in selectedFiles)
+                                    {
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <span><i class="bi bi-file-earmark-play"></i> @file.Name</span>
+                                            <span class="badge bg-secondary">@FormatFileSize(file.Size)</span>
+                                        </li>
+                                    }
+                                </ul>
                             </div>
                         }
                     </div>
@@ -46,8 +53,9 @@
                     }
 
                     <div class="d-grid">
-                        <button @onclick="ConvertVideo" class="btn btn-primary btn-lg" disabled="@(selectedFile == null || isConverting)">
-                            <i class="bi bi-arrow-repeat"></i> Convert to MP4
+                        <button @onclick="ConvertVideo" class="btn btn-primary btn-lg" 
+                                disabled="@(!selectedFiles.Any() || isConverting || validationErrors.Any())">
+                            <i class="bi bi-arrow-repeat"></i> Convert @(selectedFiles.Count > 0 ? $"{selectedFiles.Count} File(s)" : "") to MP4
                         </button>
                     </div>
 
@@ -55,6 +63,25 @@
                     {
                         <div class="alert alert-danger mt-3" role="alert">
                             <i class="bi bi-exclamation-triangle-fill"></i> @errorMessage
+                        </div>
+                    }
+
+                    @if (validationErrors.Any())
+                    {
+                        <div class="alert alert-danger mt-3" role="alert">
+                            <h6 class="alert-heading"><i class="bi bi-exclamation-triangle-fill"></i> Validation Errors:</h6>
+                            <ul class="mb-0">
+                                @foreach (var error in validationErrors)
+                                {
+                                    <li>
+                                        @if (!string.IsNullOrEmpty(error.FileName))
+                                        {
+                                            <strong>@error.FileName:</strong>
+                                        }
+                                        @error.Message
+                                    </li>
+                                }
+                            </ul>
                         </div>
                     }
 
@@ -90,7 +117,8 @@
 </div>
 
 @code {
-    private IBrowserFile? selectedFile;
+    private List<IBrowserFile> selectedFiles = new();
+    private List<ValidationError> validationErrors = new();
     private bool isConverting = false;
     private string statusMessage = "Starting conversion...";
     private string errorMessage = string.Empty;
@@ -100,18 +128,31 @@
     
     private void OnInputFileChange(InputFileChangeEventArgs e)
     {
-        var (isValid, _, mappingError) = FileValidator.Validate(e.File);
-        if (isValid)
+        if (e.FileCount > 5)
         {
-            selectedFile = e.File;
-            errorMessage = string.Empty;
+            ResetStateWithError("You can upload a maximum of 5 files at a time.");
+            return;
+        }
+
+        var files = e.GetMultipleFiles(5);
+        var results = FileValidator.Validate(files);
+        validationErrors = results
+            .Where(x => x.Value.IsOk is false)
+            .Select(x => new ValidationError(x.Key, x.Value.Error!.Description))
+            .ToList();
+
+        if (validationErrors.Any())
+        {
+            selectedFiles.Clear();
+            errorMessage = "Validation failed. See errors below.";
             conversionCompleted = false;
             conversionStats = null;
-        } 
-        else 
+        }
+        else
         {
-            selectedFile = null;
-            errorMessage = mappingError!.Description;
+            selectedFiles = files.ToList();
+            errorMessage = string.Empty;
+            validationErrors.Clear();
             conversionCompleted = false;
             conversionStats = null;
         }
@@ -119,7 +160,7 @@
 
     private async Task ConvertVideo()
     {
-        if (selectedFile == null) return;
+        if (!selectedFiles.Any()) return;
 
         isConverting = true;
         statusMessage = "Starting conversion...";
@@ -129,6 +170,8 @@
         conversionStats = null;
         StateHasChanged();
 
+        // TODO: Process all files in queue
+        var selectedFile = selectedFiles.First(); 
         var startTime = DateTime.UtcNow;
         TimeSpan videoDuration = TimeSpan.Zero;
         long originalSize = selectedFile.Size;
@@ -204,4 +247,16 @@
             StateHasChanged();
         }
     }
+
+    private void ResetStateWithError(string displayError)
+    {
+        selectedFiles.Clear();
+        validationErrors.Clear();
+        errorMessage = displayError;
+        conversionCompleted = false;
+        conversionStats = null;
+    }
+
+    private record ValidationError(string FileName, string Message);
+
 }
