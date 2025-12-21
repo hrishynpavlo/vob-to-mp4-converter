@@ -57,3 +57,4 @@ nunit-*.xml
 
 ffmpeg.*
 ffprobe.*
+.github/copilot-instructions.md
