@@ -1,0 +1,34 @@
+# FFmpeg binaries (will be installed via apt-get in Docker)
+src/VobToMp4/ffmpeg/ffmpeg.exe
+src/VobToMp4/ffmpeg/ffprobe.exe
+src/VobToMp4/ffmpeg/
+
+# Build artifacts
+**/bin/
+**/obj/
+**/published-app/
+
+# IDE and editor files
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.user
+**/*.suo
+**/*.sln.DotSettings.user
+
+# Git
+**/.git/
+**/.gitignore
+
+# Documentation
+**/*.md
+!README.md
+
+# Logs
+**/logs/
+**/*.log
+
+# Temporary files
+**/tmp/
+**/temp/
+
