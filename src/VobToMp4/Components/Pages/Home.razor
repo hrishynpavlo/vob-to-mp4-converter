@@ -4,6 +4,7 @@
 @using Serilog
 @rendermode InteractiveServer
 @inject IJSRuntime JS
+@inject FileValidator FileValidator
 
 <PageTitle>VOB to MP4 Converter</PageTitle>
 
@@ -99,10 +100,21 @@
     
     private void OnInputFileChange(InputFileChangeEventArgs e)
     {
-        selectedFile = e.File;
-        errorMessage = string.Empty;
-        conversionCompleted = false;
-        conversionStats = null;
+        var (isValid, _, mappingError) = FileValidator.Validate(e.File);
+        if (isValid)
+        {
+            selectedFile = e.File;
+            errorMessage = string.Empty;
+            conversionCompleted = false;
+            conversionStats = null;
+        } 
+        else 
+        {
+            selectedFile = null;
+            errorMessage = mappingError!.Description;
+            conversionCompleted = false;
+            conversionStats = null;
+        }
     }
 
     private async Task ConvertVideo()

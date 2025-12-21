@@ -1,6 +1,7 @@
 using FFMpegCore;
 using Serilog;
 using VobToMp4.Components;
+using VobToMp4.Helpers;
 
 namespace VobToMp4;
 
@@ -25,6 +26,7 @@ public class Program
             // Add services to the container.
             builder.Services
                 .AddSingleton<IConfiguration>(configuration)
+                .AddSingleton<FileValidator>()
                 .AddSerilog()
                 .AddRazorComponents()
                 .AddInteractiveServerComponents();
