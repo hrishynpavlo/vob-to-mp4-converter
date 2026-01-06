@@ -4,11 +4,16 @@ VOB to mp4 converter (no registration and SMS)
 # Features roadmap
 - [x] Validation (size, format by file extension, format by ffprobe)
 - [x] Multiple files upload (process one by one, manually start each one)
-- [ ] Authorization (by google using any user management provider)
-- [ ] Interactive WebAssembly mode: files converted in the browser (no upload to server)
+- [ ] Interactive WebAssembly mode: files converted in the browser (no upload to server), no authorization = wasm
+- [ ] Authorization (by Google using any user management provider)
+- [ ] Create API endpoint to stream converted file instead of reading all bytes in-memory
+- [ ] Use an internal bounded channel for file processing (number of workers = number of CPU cores), if the channel reaches capacity, then provide any estimation on UI
+- [ ] File upload (< 200 mb) for quick conversion for users with authorization and free plan, has monthly limitations (by number of files and traffic)
+- [ ] Subscription plan (prioritized channel for processing, big limits) 
 - [ ] Metrics tracking (file size, conversion time, errors)
-- [ ] Subscription plans (free, monthly, or pay per single conversion for big files)
-- [ ] Setup ci/cd deployments (docker file, multi arch builds, deploy to GCP/local k3s)
+- [ ] Integrate DataDog for metrics/logs
+- [ ] Integrate Cloudflare for rate-limitation, CDN, and bot protection 
+- [ ] Setup CI/CD deployments (multi-arch builds, deploy to GCP/local k3s)
 
 # Commands
 To build and run the Docker container locally, use the following commands:
