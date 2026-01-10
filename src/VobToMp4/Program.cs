@@ -33,6 +33,14 @@ public class Program
 
             var app = builder.Build();
 
+            // Security headers for SharedArrayBuffer (required for multi-threaded FFmpeg.wasm)
+            app.Use(async (context, next) =>
+            {
+                context.Response.Headers.Append("Cross-Origin-Opener-Policy", "same-origin");
+                context.Response.Headers.Append("Cross-Origin-Embedder-Policy", "require-corp");
+                await next();
+            });
+
             // Configure the HTTP request pipeline.
             if (!app.Environment.IsDevelopment())
             {

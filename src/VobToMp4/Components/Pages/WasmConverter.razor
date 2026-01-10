@@ -1,0 +1,401 @@
+﻿@page "/wasm-converter"
+@rendermode InteractiveServer
+@inject IJSRuntime JS
+
+<PageTitle>Browser-Based Converter</PageTitle>
+
+<div class="container">
+    <div class="card shadow-lg">
+        <div class="card-body p-5">
+            <h1 class="mb-4">
+                <i class="bi bi-cpu"></i> Browser-Based Video Converter
+            </h1>
+            <p class="text-muted mb-4">
+                Convert video files entirely in your browser using WebAssembly. No uploads, complete privacy.
+            </p>
+
+            @if (!_isBrowserCompatible)
+            {
+                <div class="alert alert-danger" role="alert">
+                    <h5 class="alert-heading">
+                        <i class="bi bi-exclamation-triangle-fill"></i> Browser Not Compatible
+                    </h5>
+                    <p>Your browser doesn't support the required features for client-side conversion:</p>
+                    <ul class="mb-0">
+                        @foreach (var issue in _compatibilityIssues)
+                        {
+                            <li>@issue</li>
+                        }
+                    </ul>
+                    <hr>
+                    <p class="mb-0">
+                        Please use a modern browser (Chrome 92+, Firefox 95+, Edge 92+, Safari 15.2+) or try the 
+                        <a href="/" class="alert-link">server-side converter</a>.
+                    </p>
+                </div>
+            }
+            else if (_isLoadingFFmpeg)
+            {
+                <div class="alert alert-info" role="alert">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <div>
+                            <strong>Loading FFmpeg.wasm from CDN...</strong>
+                            <p class="mb-0 small">This may take a few seconds (~30MB download)</p>
+                        </div>
+                    </div>
+                </div>
+            }
+            else if (!_isFFmpegReady)
+            {
+                <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-exclamation-circle"></i> FFmpeg.wasm is not loaded. Click the button below to initialize.
+                </div>
+                <div class="d-grid">
+                    <button @onclick="InitializeFFmpeg" class="btn btn-primary btn-lg">
+                        <i class="bi bi-download"></i> Load FFmpeg.wasm
+                    </button>
+                </div>
+            }
+            else
+            {
+                <!-- File Selection -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Select Video Files</label>
+                    <InputFile OnChange="OnInputFileChange" class="form-control" accept="video/*" multiple disabled="@_isProcessing" />
+                    
+                    @if (_conversionQueue.Any())
+                    {
+                        <div class="mt-3">
+                            <strong>Files in Queue (@_conversionQueue.Count):</strong>
+                            <ul class="list-group mt-2">
+                                @foreach (var job in _conversionQueue)
+                                {
+                                    <li class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div>
+                                                <i class="bi @GetStatusIcon(job.Status)"></i>
+                                                <strong>@job.FileName</strong>
+                                                <span class="badge @GetStatusBadgeClass(job.Status) ms-2">@job.Status</span>
+                                            </div>
+                                            <span class="text-muted small">@FormatFileSize(job.FileSize)</span>
+                                        </div>
+                                        
+                                        @if (job.Status == "Converting")
+                                        {
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                     role="progressbar" 
+                                                     style="width: @(job.Progress)%"
+                                                     aria-valuenow="@job.Progress" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="100">
+                                                    @job.Progress%
+                                                </div>
+                                            </div>
+                                        }
+                                        
+                                        @if (job.Status == "Completed")
+                                        {
+                                            <button @onclick="() => DownloadFile(job)" class="btn btn-sm btn-success mt-2">
+                                                <i class="bi bi-download"></i> Download MP4
+                                            </button>
+                                        }
+                                        
+                                        @if (!string.IsNullOrEmpty(job.ErrorMessage))
+                                        {
+                                            <div class="alert alert-danger mt-2 mb-0 small" role="alert">
+                                                @job.ErrorMessage
+                                            </div>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+
+                <!-- Control Buttons -->
+                <div class="d-grid gap-2">
+                    @if (!_isProcessing && _conversionQueue.Any(j => j.Status == "Queued"))
+                    {
+                        <button @onclick="StartConversion" class="btn btn-primary btn-lg">
+                            <i class="bi bi-play-fill"></i> Start Conversion
+                        </button>
+                    }
+                    
+                    @if (_isProcessing)
+                    {
+                        <button @onclick="CancelConversion" class="btn btn-danger btn-lg">
+                            <i class="bi bi-stop-fill"></i> Cancel
+                        </button>
+                    }
+                    
+                    @if (_conversionQueue.Any())
+                    {
+                        <button @onclick="ClearQueue" class="btn btn-outline-secondary" disabled="@_isProcessing">
+                            <i class="bi bi-trash"></i> Clear All
+                        </button>
+                    }
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="alert alert-danger mt-3" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill"></i> @_errorMessage
+                </div>
+            }
+        </div>
+    </div>
+    
+    <!-- Info Section -->
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-info-circle"></i> About Browser-Based Conversion</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-success">✅ Benefits:</h6>
+                    <ul class="small">
+                        <li><strong>Privacy:</strong> Files never leave your device</li>
+                        <li><strong>No file size limits:</strong> Only limited by your device memory</li>
+                        <li><strong>Works offline:</strong> After initial load</li>
+                        <li><strong>Free server resources:</strong> Processing on your CPU</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-warning">⚠️ Limitations:</h6>
+                    <ul class="small">
+                        <li><strong>Browser requirements:</strong> Chrome 92+, Firefox 95+, Edge 92+, Safari 15.2+</li>
+                        <li><strong>Processing speed:</strong> Depends on your device CPU</li>
+                        <li><strong>Memory usage:</strong> Large files may consume significant RAM</li>
+                        <li><strong>Sequential processing:</strong> One file at a time</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _isBrowserCompatible = true;
+    private List<string> _compatibilityIssues = new();
+    private bool _isLoadingFFmpeg;
+    private bool _isFFmpegReady;
+    private bool _isProcessing;
+    private string? _errorMessage;
+    
+    private List<ConversionJob> _conversionQueue = new();
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CheckBrowserCompatibility();
+        }
+    }
+    
+    private async Task CheckBrowserCompatibility()
+    {
+        try
+        {
+            var result = await JS.InvokeAsync<BrowserCompatibility>("ffmpegInterop.checkBrowserCompatibility");
+            _isBrowserCompatible = result.IsCompatible;
+            _compatibilityIssues = result.Issues ?? new List<string>();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _isBrowserCompatible = false;
+            _compatibilityIssues.Add($"Failed to check compatibility: {ex.Message}");
+            StateHasChanged();
+        }
+    }
+    
+    private async Task InitializeFFmpeg()
+    {
+        _isLoadingFFmpeg = true;
+        _errorMessage = null;
+        StateHasChanged();
+        
+        try
+        {
+            var dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("ffmpegInterop.loadFFmpeg", dotNetRef);
+            _isFFmpegReady = true;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load FFmpeg.wasm: {ex.Message}";
+        }
+        finally
+        {
+            _isLoadingFFmpeg = false;
+            StateHasChanged();
+        }
+    }
+    
+    private void OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        _errorMessage = null;
+        
+        foreach (var file in e.GetMultipleFiles(20)) // Allow up to 20 files
+        {
+            var job = new ConversionJob
+            {
+                FileName = file.Name,
+                FileSize = file.Size,
+                Status = "Queued",
+                Progress = 0,
+                BrowserFile = file
+            };
+            
+            _conversionQueue.Add(job);
+        }
+        
+        StateHasChanged();
+    }
+    
+    private async Task StartConversion()
+    {
+        _isProcessing = true;
+        _errorMessage = null;
+        StateHasChanged();
+        
+        try
+        {
+            var queuedJobs = _conversionQueue.Where(j => j.Status == "Queued").ToList();
+            
+            foreach (var job in queuedJobs)
+            {
+                if (!_isProcessing) break; // Cancelled
+                
+                job.Status = "Converting";
+                StateHasChanged();
+                
+                try
+                {
+                    // Read file into memory
+                    using var stream = job.BrowserFile.OpenReadStream(maxAllowedSize: 5L * 1024 * 1024 * 1024); // 5GB max
+                    using var ms = new MemoryStream();
+                    await stream.CopyToAsync(ms);
+                    var fileData = ms.ToArray();
+                    
+                    // Convert using FFmpeg.wasm
+                    var outputFileName = Path.GetFileNameWithoutExtension(job.FileName) + ".mp4";
+                    var dotNetRef = DotNetObjectReference.Create(this);
+                    
+                    var resultData = await JS.InvokeAsync<byte[]>(
+                        "ffmpegInterop.convertVideo",
+                        job.FileName,
+                        fileData,
+                        outputFileName,
+                        dotNetRef
+                    );
+                    
+                    job.OutputData = resultData;
+                    job.Status = "Completed";
+                    job.Progress = 100;
+                }
+                catch (Exception ex)
+                {
+                    job.Status = "Failed";
+                    job.ErrorMessage = ex.Message;
+                }
+                
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Conversion error: {ex.Message}";
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+    
+    private void CancelConversion()
+    {
+        _isProcessing = false;
+        StateHasChanged();
+    }
+    
+    private void ClearQueue()
+    {
+        _conversionQueue.Clear();
+        StateHasChanged();
+    }
+    
+    private async Task DownloadFile(ConversionJob job)
+    {
+        if (job.OutputData == null) return;
+        
+        var fileName = Path.GetFileNameWithoutExtension(job.FileName) + ".mp4";
+        await JS.InvokeVoidAsync("downloadFile", fileName, job.OutputData);
+    }
+    
+    [JSInvokable]
+    public void UpdateProgress(int progress, double time)
+    {
+        var currentJob = _conversionQueue.FirstOrDefault(j => j.Status == "Converting");
+        if (currentJob != null)
+        {
+            currentJob.Progress = progress;
+            StateHasChanged();
+        }
+    }
+    
+    private string GetStatusIcon(string status) => status switch
+    {
+        "Queued" => "bi-hourglass",
+        "Converting" => "bi-arrow-repeat",
+        "Completed" => "bi-check-circle-fill text-success",
+        "Failed" => "bi-x-circle-fill text-danger",
+        _ => "bi-question-circle"
+    };
+    
+    private string GetStatusBadgeClass(string status) => status switch
+    {
+        "Queued" => "bg-secondary",
+        "Converting" => "bg-primary",
+        "Completed" => "bg-success",
+        "Failed" => "bg-danger",
+        _ => "bg-secondary"
+    };
+    
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+    
+    private class ConversionJob
+    {
+        public string FileName { get; set; } = string.Empty;
+        public long FileSize { get; set; }
+        public string Status { get; set; } = "Queued";
+        public int Progress { get; set; }
+        public string? ErrorMessage { get; set; }
+        public byte[]? OutputData { get; set; }
+        public IBrowserFile BrowserFile { get; set; } = null!;
+    }
+    
+    private class BrowserCompatibility
+    {
+        public bool IsCompatible { get; set; }
+        public List<string>? Issues { get; set; }
+    }
+}
+
