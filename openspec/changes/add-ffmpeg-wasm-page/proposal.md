@@ -46,9 +46,10 @@ Providing a client-side conversion option using FFmpeg.wasm allows users to conv
 - Parallel processing capability (user's multi-core CPU)
 
 ### Trade-offs
-- Initial page load includes ~30MB FFmpeg.wasm library
-- Requires modern browser with WebAssembly support
-- Processing speed depends on user's device
-- Memory constraints based on user's available RAM
-- No conversion history or server-side tracking
+- Increases application bundle size by ~30MB (FFmpeg.wasm files)
+- Requires modern browser with WebAssembly and SharedArrayBuffer support
+- Processing speed depends on user's device CPU
+- Memory constraints based on user's available RAM (max 5GB per file)
+- No external CDN dependencies - fully self-contained deployment
+- Files cached by browser after first load for better subsequent performance
 

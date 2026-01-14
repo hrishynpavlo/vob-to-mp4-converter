@@ -1,4 +1,4 @@
-﻿## ADDED Requirements
+﻿﻿## ADDED Requirements
 
 ### Requirement: FFmpeg.wasm Integration
 The system SHALL integrate FFmpeg.wasm library to enable client-side video conversion without server processing.
@@ -177,20 +177,23 @@ The system SHALL provide intuitive navigation and user interface for the WASM co
 
 #### Scenario: Access WASM converter from menu
 - **GIVEN** user is on any page of the application
-- **WHEN** user clicks "Browser Converter" in navigation menu
-- **THEN** WASM converter page loads
-- **AND** page shows clear instructions for use
+- **WHEN** user clicks "Browser Converter" link in NavMenu
+- **THEN** browser navigates to `/wasm-converter` route
+- **AND** page shows title "Browser-Based Video Converter" with CPU icon
+- **AND** page explains "Convert video files entirely in your browser using WebAssembly"
 
 #### Scenario: Switch between server and client conversion
 - **GIVEN** user is on WASM converter page
 - **WHEN** user wants to use server-side conversion instead
-- **THEN** navigation menu provides link to traditional converter
+- **THEN** navigation menu provides "Server Converter" link to home page
 - **AND** user can easily switch between the two options
+- **AND** each page is independent with separate state
 
-#### Scenario: Display feature comparison
-- **GIVEN** user is deciding which converter to use
-- **WHEN** user views converter selection page or help section
-- **THEN** comparison table shows benefits of each option
-- **AND** recommendations are provided based on use case
-- **AND** file size limitations for each option are clearly stated
+#### Scenario: View feature comparison
+- **GIVEN** user is on WASM converter page
+- **WHEN** user scrolls to bottom info section
+- **THEN** card displays "About Browser-Based Conversion"
+- **AND** "Benefits" column lists privacy, no file size limits, works offline, free server resources
+- **AND** "Limitations" column lists browser requirements, processing speed, memory usage, sequential processing
+- **AND** clear comparison helps user understand when to use each converter
 

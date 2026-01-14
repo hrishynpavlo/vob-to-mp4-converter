@@ -246,12 +246,14 @@ If critical issues arise:
 **Rationale**: Sequential processing only for WASM page. This prevents browser memory exhaustion and keeps implementation simple. Users can still process multiple files, but one at a time.
 
 ### Question 2: Should we package FFmpeg.wasm with the app or use CDN?
-**Decision**: Use CDN
-**Rationale**: Load FFmpeg.wasm from CDN to reduce bundle size and leverage browser caching across sites. Use official FFmpeg.wasm CDN (unpkg or jsdelivr) for reliability.
+**Decision**: Package locally
+**Rationale**: Bundle FFmpeg.wasm files with the application to ensure reliability, enable offline operation after first load, and avoid CDN dependencies or failures.
 **Implementation**: 
-- Primary: Load from CDN (unpkg.com/@ffmpeg/core or jsdelivr)
-- Fallback: If CDN fails, show error message directing user to check internet connection
-- No local bundling to keep deployment package small
+- Store files in `wwwroot/lib/ffmpeg/` directory
+- Include `ffmpeg-core.js`, `ffmpeg-core.wasm`, and `814.ffmpeg.js`
+- Reference via `<script>` tag in `App.razor`
+- Load from local origin: `${baseURL}/lib/ffmpeg/...`
+- No external network dependencies for conversion functionality
 
 ### Question 3: Should we persist conversion settings?
 **Decision**: No

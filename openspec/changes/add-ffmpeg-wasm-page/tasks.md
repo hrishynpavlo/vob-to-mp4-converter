@@ -49,10 +49,12 @@
 - [ ] 8.5 Add loading indicators and skeleton screens
 
 ## 9. Deployment Preparation
-- [ ] 9.1 Verify COOP/COEP headers are configured correctly in production
-- [ ] 9.2 Test CDN loading from production environment
-- [ ] 9.3 Test production build with minification
-- [ ] 9.4 Verify HTTPS headers for SharedArrayBuffer (Cross-Origin-Opener-Policy, Cross-Origin-Embedder-Policy)
-- [ ] 9.5 Update deployment documentation with CDN dependencies
+- [x] 9.1 Verify COOP/COEP headers in Program.cs middleware
+- [x] 9.2 Ensure FFmpeg.wasm files are included in wwwroot/lib/ffmpeg/
+- [x] 9.3 Configure static file serving for .wasm and .js files
+- [x] 9.4 Verify Cross-Origin-Isolate context via crossOriginIsolated check
+- [ ] 9.5 Test production build and verify file compression (gzip/brotli)
+- [ ] 9.6 Document FFmpeg.wasm version and update procedures
+- [ ] 9.7 Add deployment checklist for COOP/COEP header verification
 
 
