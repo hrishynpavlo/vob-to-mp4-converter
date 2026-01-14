@@ -64,7 +64,7 @@
                 <!-- File Selection -->
                 <div class="mb-4">
                     <label class="form-label fw-bold">Select Video Files</label>
-                    <InputFile OnChange="OnInputFileChange" class="form-control" accept="video/*" multiple disabled="@_isProcessing" />
+                    <InputFile id="wasmFileInput" OnChange="OnInputFileChange" class="form-control" accept="video/*" multiple disabled="@_isProcessing" />
                     
                     @if (_conversionQueue.Any())
                     {
@@ -180,6 +180,7 @@
 </div>
 
 @code {
+    private IJSObjectReference? _module;
     private bool _isBrowserCompatible = true;
     private List<string> _compatibilityIssues = new();
     private bool _isLoadingFFmpeg;
@@ -193,7 +194,44 @@
     {
         if (firstRender)
         {
+            await InitializeFFmpegModule();
+        }
+    }
+    
+    private async Task InitializeFFmpegModule()
+    {
+        _isLoadingFFmpeg = true;
+        StateHasChanged();
+        
+        try
+        {
+            // Load the page-specific JavaScript module
+            _module = await JS.InvokeAsync<IJSObjectReference>(
+                "import", 
+                "./Components/Pages/WasmConverter.razor.js"
+            );
+            
+            // Initialize FFmpeg.wasm (loads scripts dynamically)
+            var loaded = await _module.InvokeAsync<bool>("initialize");
+            
+            if (!loaded)
+            {
+                _errorMessage = "Failed to load FFmpeg.wasm library";
+                _isBrowserCompatible = false;
+                _isLoadingFFmpeg = false;
+                StateHasChanged();
+                return;
+            }
+            
+            // Check browser compatibility
             await CheckBrowserCompatibility();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Initialization error: {ex.Message}";
+            _isBrowserCompatible = false;
+            _isLoadingFFmpeg = false;
+            StateHasChanged();
         }
     }
     
@@ -201,15 +239,23 @@
     {
         try
         {
-            var result = await JS.InvokeAsync<BrowserCompatibility>("ffmpegInterop.checkBrowserCompatibility");
+            if (_module == null)
+            {
+                throw new Exception("Module not loaded");
+            }
+            
+            var result = await _module.InvokeAsync<BrowserCompatibility>("checkCompatibility");
             _isBrowserCompatible = result.IsCompatible;
             _compatibilityIssues = result.Issues ?? new List<string>();
-            StateHasChanged();
         }
         catch (Exception ex)
         {
             _isBrowserCompatible = false;
             _compatibilityIssues.Add($"Failed to check compatibility: {ex.Message}");
+        }
+        finally
+        {
+            _isLoadingFFmpeg = false;
             StateHasChanged();
         }
     }
@@ -222,8 +268,13 @@
         
         try
         {
+            if (_module == null)
+            {
+                throw new Exception("Module not loaded");
+            }
+            
             var dotNetRef = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("ffmpegInterop.loadFFmpeg", dotNetRef);
+            await _module.InvokeVoidAsync("loadFFmpeg", dotNetRef);
             _isFFmpegReady = true;
         }
         catch (Exception ex)
@@ -266,10 +317,17 @@
         
         try
         {
+            if (_module == null)
+            {
+                throw new Exception("Module not loaded");
+            }
+            
             var queuedJobs = _conversionQueue.Where(j => j.Status == "Queued").ToList();
             
-            foreach (var job in queuedJobs)
+            for (int i = 0; i < queuedJobs.Count; i++)
             {
+                var job = queuedJobs[i];
+                
                 if (!_isProcessing) break; // Cancelled
                 
                 job.Status = "Converting";
@@ -277,27 +335,34 @@
                 
                 try
                 {
-                    // Read file into memory
-                    using var stream = job.BrowserFile.OpenReadStream(maxAllowedSize: 5L * 1024 * 1024 * 1024); // 5GB max
-                    using var ms = new MemoryStream();
-                    await stream.CopyToAsync(ms);
-                    var fileData = ms.ToArray();
-                    
-                    // Convert using FFmpeg.wasm
+                    // ✅ NO FILE UPLOAD TO SERVER!
+                    // JavaScript reads file directly from input element
                     var outputFileName = Path.GetFileNameWithoutExtension(job.FileName) + ".mp4";
                     var dotNetRef = DotNetObjectReference.Create(this);
                     
-                    var resultData = await JS.InvokeAsync<byte[]>(
-                        "ffmpegInterop.convertVideo",
-                        job.FileName,
-                        fileData,
+                    // Get file index in queue
+                    var fileIndex = _conversionQueue.IndexOf(job);
+                    
+                    // Call JavaScript module to convert file client-side
+                    var success = await _module.InvokeAsync<bool>(
+                        "convertVideoFromInput",
+                        "wasmFileInput",
+                        fileIndex,
                         outputFileName,
                         dotNetRef
                     );
                     
-                    job.OutputData = resultData;
-                    job.Status = "Completed";
-                    job.Progress = 100;
+                    if (success)
+                    {
+                        job.OutputFileName = outputFileName;
+                        job.Status = "Completed";
+                        job.Progress = 100;
+                    }
+                    else
+                    {
+                        job.Status = "Failed";
+                        job.ErrorMessage = "Conversion failed";
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -333,10 +398,18 @@
     
     private async Task DownloadFile(ConversionJob job)
     {
-        if (job.OutputData == null) return;
+        if (string.IsNullOrEmpty(job.OutputFileName) || _module == null) return;
         
-        var fileName = Path.GetFileNameWithoutExtension(job.FileName) + ".mp4";
-        await JS.InvokeVoidAsync("downloadFile", fileName, job.OutputData);
+        // ✅ Download from client-side storage (no server transfer)
+        await _module.InvokeVoidAsync("downloadConvertedFile", job.OutputFileName);
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        if (_module != null)
+        {
+            await _module.DisposeAsync();
+        }
     }
     
     [JSInvokable]
@@ -388,7 +461,7 @@
         public string Status { get; set; } = "Queued";
         public int Progress { get; set; }
         public string? ErrorMessage { get; set; }
-        public byte[]? OutputData { get; set; }
+        public string? OutputFileName { get; set; } // ✅ Stored in browser, not on server
         public IBrowserFile BrowserFile { get; set; } = null!;
     }
     
