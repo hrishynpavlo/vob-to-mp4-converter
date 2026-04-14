@@ -27,6 +27,7 @@ public class Program
             builder.Services
                 .AddSingleton<IConfiguration>(configuration)
                 .AddSingleton<FileValidator>()
+                .AddSingleton<DownloadManager>()
                 .AddSerilog()
                 .AddRazorComponents()
                 .AddInteractiveServerComponents();
@@ -46,6 +47,17 @@ public class Program
             app.UseAntiforgery();
 
             app.MapStaticAssets();
+
+            app.MapGet("/api/download/{token}", (string token, DownloadManager dm) =>
+            {
+                var entry = dm.TryGet(token);
+                if (entry is null || !File.Exists(entry.FilePath))
+                    return Results.NotFound();
+
+                var stream = File.OpenRead(entry.FilePath);
+                return Results.File(stream, "video/mp4", entry.FileName, enableRangeProcessing: true);
+            });
+
             app.MapRazorComponents<App>()
                 .AddInteractiveServerRenderMode();
 

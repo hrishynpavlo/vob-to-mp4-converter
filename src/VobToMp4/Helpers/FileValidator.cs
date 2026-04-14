@@ -5,7 +5,7 @@ namespace VobToMp4.Helpers;
 
 public class FileValidator
 {
-    private const int MaxFileCount = 5;
+    private const int MaxFileCount = 10;
     private static readonly IReadOnlySet<string> AllowedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         ".vob"

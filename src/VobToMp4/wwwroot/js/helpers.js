@@ -14,10 +14,11 @@ window.getFiles = async function (input) {
     return results;
 };
 
-window.downloadFile = (bytes, type, filename) => {
-    const blob = new Blob([bytes], { type });
+window.triggerDownload = (url, filename) => {
     const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
+    link.href = url;
     link.download = filename;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
 };
