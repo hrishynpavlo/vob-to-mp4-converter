@@ -7,6 +7,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "misc", "misc", "{5B196B6C-C
 		Directory.Packages.props = Directory.Packages.props
 		..\Dockerfile = ..\Dockerfile
 		..\.dockerignore = ..\.dockerignore
+		..\Dockerfile.arm64 = ..\Dockerfile.arm64
+		..\.github\workflows\build-arm64.yml = ..\.github\workflows\build-arm64.yml
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{0562E6EE-02AB-4404-B4EB-D5841916F2AC}"
