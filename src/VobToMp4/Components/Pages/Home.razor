@@ -253,6 +253,10 @@
         var mp4Name = Path.ChangeExtension(item.FileName, ".mp4");
         var token = DownloadManager.Register(item.OutputPath, mp4Name);
         await JS.InvokeVoidAsync("triggerDownload", $"/api/download/{token}", mp4Name);
+
+        item.Status = FileConversionStatus.Downloaded;
+        item.OutputPath = null;
+        StateHasChanged();
     }
 
     private void ResetStateWithError(string displayError)
@@ -301,6 +305,7 @@
         FileConversionStatus.Converting => "bi bi-gear-fill",
         FileConversionStatus.ReadingOutput => "bi bi-file-earmark-arrow-down",
         FileConversionStatus.Completed => "bi bi-check-circle-fill text-success",
+        FileConversionStatus.Downloaded => "bi bi-check-circle-fill text-muted",
         FileConversionStatus.Failed => "bi bi-x-circle-fill text-danger",
         _ => "bi bi-file-earmark"
     };

@@ -54,8 +54,13 @@ public class Program
                 if (entry is null || !File.Exists(entry.FilePath))
                     return Results.NotFound();
 
-                var stream = File.OpenRead(entry.FilePath);
-                return Results.File(stream, "video/mp4", entry.FileName, enableRangeProcessing: true);
+                var bytes = File.ReadAllBytes(entry.FilePath);
+                dm.Remove(token);
+
+                try { File.Delete(entry.FilePath); }
+                catch { Console.WriteLine($"File {token} not found on clean-up"); }
+
+                return Results.File(bytes, "video/mp4", entry.FileName);
             });
 
             app.MapRazorComponents<App>()

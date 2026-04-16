@@ -27,6 +27,7 @@ public enum FileConversionStatus
     Converting,
     ReadingOutput,
     Completed,
+    Downloaded,
     Failed
 }
 
