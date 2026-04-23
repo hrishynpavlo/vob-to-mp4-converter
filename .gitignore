@@ -55,6 +55,10 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 
-ffmpeg.*
-ffprobe.*
+ffmpeg.exe
+ffprobe.exe
+ffmpeg
+ffprobe
 .github/copilot-instructions.md
+
+!wwwroot/lib/ffmpeg/
